@@ -70,9 +70,9 @@ arrival_time_next_departure = zeros(m,1);
 % 
 % server_status m*3 matrix represents the status of servers. The first column shows the
 % state of the server, where 0 is off, 1 is setup, 2 is busy and 3 is
-% delayedoff, the second column shows the remaining setup time and the
-% third column shows the remaining delayedoff time
-% Initially all servers are off and both timers are 0
+% delayedoff, the second column shows the setup complete time and the
+% third column shows the delayedoff complete time
+% Initially all servers are off and both timers are inf
 % 
 % queue_length is the number of jobs in the queue
 % 
@@ -88,7 +88,8 @@ arrival_time_next_departure = zeros(m,1);
 master_clock = 0; 
 % 
 % Intialise server status
-server_status = zeros(m,3);
+temp = [0 inf inf];
+server_status = repmat(temp,m,1);
 % 
 % Initialise queue
 queue_content = [];
@@ -98,8 +99,12 @@ queue_length = 0;
 while (master_clock < time_end)
     % Find the server with the first departing job
     [first_departure_time,first_departure_server] = min(next_departure_time);
-    % 
-    % Find out whether the next event is an arrival or depature
+    % Find the server that first finishs setup timer
+    [first_setup_time,first_setup_server] = ;
+    % Find the server that frist finishs delayedoff (Tc) timer 
+    [first_delayedoff_time,first_delayedoff_server] = ;
+    % Find out whether the next event is an arrival, depature, finishing
+    % setup or finishing delayedoff
     %
     % We use next_event_type = 1 for arrival and 0 for departure
     % 
@@ -112,6 +117,10 @@ while (master_clock < time_end)
         next_event_type = 0;
     end    
     
+    %======
+    % need to add server finish setup and delayedoff events
+    %======
+    
     %update master clock
     master_clock = next_event_time;
     %
@@ -120,7 +129,7 @@ while (master_clock < time_end)
     if (next_event_type == 1) % an arrival 
         if (any(server_status(:,1)==3)) % any server is delayedoff
             %
-            % sent the job to server with the highest Tc and change the server's
+            % send the job to server with the highest Tc and change the server's
             % status to busy
             [temp, chosen_server] = max(server_status(:,3));
             server_status(chosen_server,1) = 2;
@@ -134,6 +143,10 @@ while (master_clock < time_end)
        
         else
             if (any(server_status(:,1)==0)) % any server is off
+                %
+                % choose a random server and change the server's status to
+                % setup 
+                
                 
             
 %         if all(server_busy) 
