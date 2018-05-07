@@ -1,4 +1,7 @@
 function avg_response_time = sim_func(mode,arrival,service,m,setup_time,delayedoff_time,time_end)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Input parameters
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % There are 7 user simulation parameters:
 % 1. mode, which can either be random or trace.
 % 2. arrival
@@ -20,7 +23,8 @@ num_job_served = 0; % number of completed jobs at the end of the simulation
 % Events
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% There are two events: An arrival event and a departure event
+% There are four events: An arrival event, a departure event, a server
+% setup complete event and a server delayedoff complete event
 %
 % An arrival event is specified by
 % next_arrival_time = the time at which the next job arrives
@@ -37,9 +41,8 @@ num_job_served = 0; % number of completed jobs at the end of the simulation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 
 % Initialising the arrival event based on mode
-% When the simulation is in random mode
 
-if strcmp(mode,'random')==1
+if strcmp(mode,'random')==1 % When the simulation is in random mode
     %
     %The inter-arrival probability distribution is exponentially
     %distributed with parameter arrival from the input.
@@ -65,14 +68,14 @@ arrival_time_next_departure = zeros(m,1);
 % events = [next_arrival_time service_time_next_arrival]; 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Initialising the Master clock, server status, queue_length,
+% Initialising the Master clock, server status, queue_length and
 % queue_content
 % 
-% server_status m*3 matrix represents the status of servers. The first column shows the
+% server_status is a m*3 matrix represents the status of servers. The first column shows the
 % state of the server, where 0 is off, 1 is setup, 2 is busy and 3 is
 % delayedoff, the second column shows the setup complete time and the
-% third column shows the delayedoff complete time
-% Initially all servers are off and both timers are inf
+% third column shows the delayedoff (Tc) complete time
+% Initially all servers are off and both times are NaN
 % 
 % queue_length is the number of jobs in the queue
 % 
@@ -88,8 +91,7 @@ arrival_time_next_departure = zeros(m,1);
 master_clock = 0; 
 % 
 % Intialise server status
-temp = [0 inf inf];
-server_status = repmat(temp,m,1);
+server_status = repmat([0,nan,nan],m,1);
 % 
 % Initialise queue
 queue_content = [];
@@ -97,46 +99,54 @@ queue_length = 0;
 
 % Start iteration until the end time
 while (master_clock < time_end)
+    %%%%%%%%%%%%%%%%%%%%%%%[
+    %Determining next event type
+    %%%%%%%%%%%%%%%%%%%%%%%
     % Find the server with the first departing job
     [first_departure_time,first_departure_server] = min(next_departure_time);
-    % Find the server that first finishs setup timer
-    [first_setup_time,first_setup_server] = ;
-    % Find the server that frist finishs delayedoff (Tc) timer 
-    [first_delayedoff_time,first_delayedoff_server] = ;
-    % Find out whether the next event is an arrival, depature, finishing
-    % setup or finishing delayedoff
+    % Find the server that will first complete setup state 
+    [first_setup_time,first_setup_server] = min(server_status(:,2));
+    % Find the server that will first complete delayedoff state
+    [first_delayedoff_time,first_delayedoff_server] = min(server_status(:,3));
     %
-    % We use next_event_type = 1 for arrival and 0 for departure
-    % 
-    if (next_arrival_time < first_departure_time)
+    % Find out whether the next event is an arrival, depature, completing
+    % setup or completing delayedoff
+    % We use next_event_type = 0 for departure, 1 for arrival, 2 for
+    % completing setup and 3 for completing delayedoff
+    % The type of the event is determined by time, which are next arrival
+    % time, first departure time, first setup time and first delayedoff time. 
+    % The event with the minimum time will be the next event.
+    %
+    time_list=[next_arrival_time, first_departure_time, first_setup_time, first_delayedoff_time];
+    if (min(time_list)==next_arrival_time) %arrival event
+        next_event_type = 1;
         next_event_time = next_arrival_time;
-        next_event_type = 1;  
-    else
-        next_event_time = first_departure_time;
-        % first departure server has already been found just now
+    elseif (min(time_list)==first_departure_time) %departure event
         next_event_type = 0;
+        next_event_time = first_departure_time;
+    elseif (min(time_list)==first_setup_time) %completing setup event
+        next_event_type = 2;
+        next_event_time = first_setup_time;
+    else %completing delayed off event 
+        next_event_tyoe =3;
+        next_event_time = first_delayedoff_time;
     end    
-    
-    %======
-    % need to add server finish setup and delayedoff events
-    %======
-    
+       
     %update master clock
     master_clock = next_event_time;
     %
     % take actions depending on the event type
     % 
-    if (next_event_type == 1) % an arrival 
+    if (next_event_type == 1) % an arrival event  
         if (any(server_status(:,1)==3)) % any server is delayedoff
             %
-            % send the job to server with the highest Tc and change the server's
+            % send the job to server with the highest remaining Tc and change the server's
             % status to busy
             [temp, chosen_server] = max(server_status(:,3));
-            server_status(chosen_server,1) = 2;
+            server_status(chosen_server,:) = [2,nan,nan];
             %
             % Schedule departure event with 
             % the departure time is arrival time + service time
-            
             next_departure_time(chosen_server) = ...
             next_arrival_time + service_time_next_arrival;
             arrival_time_next_departure(chosen_server) = next_arrival_time;
@@ -146,64 +156,113 @@ while (master_clock < time_end)
                 %
                 % choose a random server and change the server's status to
                 % setup 
-                
-                
-            
-%         if all(server_busy) 
-%             % 
-%             % add job to queue_content and
-%             % increment queue length
-%             % 
-%             queue_content = [queue_content ; next_arrival_time service_time_next_arrival];
-%             queue_length = queue_length + 1;        
-%         else % not all server are busy
-%             % 
-%             % Send the job to any available server
-%             % 
-%             % Schedule departure event with 
-%             % the departure time is arrival time + service time 
-%             % Also, set server_busy to 1
-%             % 
-%             idle_server = min(find(server_busy == 0));
-%             next_departure_time(idle_server) = ...
-%                 next_arrival_time + service_time_next_arrival;
-%             arrival_time_next_departure(idle_server) = next_arrival_time;
-%             server_busy(idle_server) = 1;
-%         end
-        % generate a new job and schedule its arrival 
-        next_arrival_time = master_clock - log(1-rand(1))/lambda;
-        service_time_next_arrival = -log(1-rand(1))/mu; 
-        
-        % This is for checking only
-        % events = [events ; next_arrival_time service_time_next_arrival]; 
-    else % a departure 
+                temp_list = find(any(server_status(:,1)==0)); %all servers in off state
+                pos = randi(length(temp_list));
+                chosen_server = temp_list(pos);
+                server_status(chosen_server,1)=3; %change server state to setup
+                %
+                % add setup complete time to the server status
+                server_status(chosen_server,2)=master_clock+setup_time;
+                %
+                % Increment the length of queue by 1
+                queue_length = queue_length+1;
+                %
+                % store the arriving job in queue including its arrival
+                % time and service time; mark the job
+                job_arrive_info = [next_arrival_time, service_time_next_arrival, 1];
+                queue_content = [queue_content;job_arrive_info];
+            else % all servers are either busy or setup
+                %
+                % store the job in queue and unmark the job
+                queue_length = queue_length+1;
+                job_arrive_info = [next_arrival_time, service_time_next_arrival, 0];
+                queue_content = [queue_content;job_arrive_info];
+            end
+        end
+        % generate a new job and schedule its arrival
+        next_arrival_time = master_clock - log(1-rand(1))/arrival;
+        service_time_next_arrival = -log(1-rand(1))/service; 
+     
+    elseif (next_event_type == 0) % a departure event
         % 
         % Update the variables:
         % 1) Cumulative response time T
-        % 2) Number of departed jobs N
+        % 2) Number of departed customers N
         % 
         response_time_cumulative = response_time_cumulative + master_clock - arrival_time_next_departure(first_departure_server);
         num_job_served = num_job_served + 1;
-        % 
-        if queue_length % queue not empty
-            % 
-            % schedule the next departure event using the first job 
-            % in the queue, i.e. use the 1st row in queue_content
-            % 
-            next_departure_time(first_departure_server) = ...
-                master_clock + queue_content(1,2);
-            arrival_time_next_departure(first_departure_server) = ...
-                queue_content(1,1);
-            % 
-            % remove job from queue and decrement queue length
-            % 
-            queue_content(1,:) = [];
-            queue_length = queue_length - 1;
-        else % queue empty
+        
+        if (queue_length==0) %queue is empty
+            %
+            % server becomes delayedoff and set up the delayedoff timer
+            server_status(first_departure_server,1) = 3;
+            server_status(first_departure_server,3) = master_clock+delayedoff_time;
+            % empty this departure event
             next_departure_time(first_departure_server) = Inf;
-            server_busy(first_departure_server) = 0;
-        end    
-    end        
+            arrival_time_next_departure(first_departure_server) = 0;
+            
+        else %queue is not empty
+            %
+            % the server remains busy and takes in the first job in queue
+            job_send_info = queue_content(1,:); % information of the frist job in queue 
+            next_departure_time(first_departure_server) = job_send_info(2)+master_clock;
+            arrival_time_next_departure(first_departure_server) = job_send_info(1);
+            %
+            % remove the sent job from queue and decrement number of jobs in queue by 1
+            queue_content = queue_content(2:end);
+            queue_length = queue_length-1;
+            
+            if (job_send_info(3)==1) % if the sent job is marked
+                if(any(queue_content(:,3)==0)) % if any remaining job in queue is unmarked
+                    %
+                    % change the first umarked job in queue to marked
+                    row_number = find(queue_content(:,3)==0,1);
+                    queue_content(row_number,3)=1;
+                else %if no remaining job in queue is unmarked
+                    %
+                    % turn off the server in set-up with the longest
+                    % remaining set up time
+                    [temp, chosen_server] = max(server_status(:,2));
+                    server_status(chosen_server,:) = [0,nan,nan];
+                end
+            end
+        end
+    
+    
+    elseif (next_event_type == 2) %completing setup event
+        %
+        % A server finishes setup. 
+        % Find the first marked job in queue
+        row_number = find(queue_content(:,3)==1,1);
+        job_send_info =  queue_content(1,:);
+        % remove this job from queue
+        queue_length = queue_length-1;
+        removerows(queue_content,row_number);
+        % sent this job to this server
+        next_departure_time(first_setup_server) = job_send_info(2)+master_clock;
+        arrival_time_next_departure(first_setup_server) = job_send_info(1);
+        % change server status to busy
+        server_status(first_setup_server,:)=[2,nan,nan];
+        
+    else %completing delayedoff event
+        %
+        % A server finishes delayedoff
+        % Change the server to OFF
+        server_status(first_delayedoff_server,:)=[0,nan,nan];
+    end
+        
+                    
+                    
+                
+                 
+                    
+                
+
+            
+            
+            
+            
+       
 end        
      
 avg_response_time = response_time_cumulative/num_job_served;
