@@ -18,6 +18,8 @@ function avg_response_time = sim_func(mode,arrival,service,m,setup_time,delayedo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 response_time_cumulative = 0; %  The cumulative response time 
 num_job_served = 0; % number of completed jobs at the end of the simulation
+mode_type = 0; % 0 means random mode, 1 means trace mode
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Events
@@ -43,6 +45,7 @@ num_job_served = 0; % number of completed jobs at the end of the simulation
 % Initialising the arrival event based on mode
 
 if strcmp(mode,'random')==1 % When the simulation is in random mode
+    mode_type = 0;
     %
     %The inter-arrival probability distribution is exponentially
     %distributed with parameter arrival from the input.
@@ -54,7 +57,22 @@ if strcmp(mode,'random')==1 % When the simulation is in random mode
     service_time_next_arrival_2 = -log(1-rand(1))/service;
     service_time_next_arrival_3 = -log(1-rand(1))/service;
     service_time_next_arrival = service_time_next_arrival_1+service_time_next_arrival_2+service_time_next_arrival_3;
+
+elseif strcmp(mode,'trace')==1 % when the simulation is in trace mode
+    mode_type = 1;
+    list_count = 1;
+    
+    temp = fopen('arrival.txt','r');
+    arrival_time_list = fscanf(temp,'%f');
+    next_arrival_time =  arrival_time_list(list_count);
+    fclose(temp);
+    
+    temp = fopen('service.txt','r');
+    service_time_list = fscanf(temp,'%f');
+    service_time_next_arrival = service_time_list(list_count);
+    fclose(temp);
 end
+
 
 % 
 % Initialise both departure events to empty
@@ -179,10 +197,16 @@ while (master_clock < time_end)
                 queue_content = [queue_content;job_arrive_info];
             end
         end
-        % generate a new job and schedule its arrival
-        next_arrival_time = master_clock - log(1-rand(1))/arrival;
-        service_time_next_arrival = -log(1-rand(1))/service; 
-     
+        % generate a new job and schedule its arrival based on mode
+        if (mode_type==0) %random mode
+            next_arrival_time = master_clock - log(1-rand(1))/arrival;
+            service_time_next_arrival = -log(1-rand(1))/service;
+        elseif (mode_type==1) %trace mode
+            list_count = list_count+1;
+            next_arrival_time =  arrival_time_list(list_count);
+            service_time_next_arrival = service_time_list(list_count);
+        end
+        
     elseif (next_event_type == 0) % a departure event
         % 
         % Update the variables:
@@ -191,6 +215,7 @@ while (master_clock < time_end)
         % 
         response_time_cumulative = response_time_cumulative + master_clock - arrival_time_next_departure(first_departure_server);
         num_job_served = num_job_served + 1;
+        disp([arrival_time_next_departure(first_departure_server),next_departure_time(first_departure_server)]);
         
         if (queue_length==0) %queue is empty
             %
@@ -209,7 +234,7 @@ while (master_clock < time_end)
             arrival_time_next_departure(first_departure_server) = job_send_info(1);
             %
             % remove the sent job from queue and decrement number of jobs in queue by 1
-            queue_content = queue_content(2:end);
+            removerows(queue_content,1);
             queue_length = queue_length-1;
             
             if (job_send_info(3)==1) % if the sent job is marked
@@ -244,7 +269,7 @@ while (master_clock < time_end)
         % change server status to busy
         server_status(first_setup_server,:)=[2,nan,nan];
         
-    else %completing delayedoff event
+    elseif (next_event_type == 3) %completing delayedoff event
         %
         % A server finishes delayedoff
         % Change the server to OFF
