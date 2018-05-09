@@ -1,4 +1,12 @@
-function avg_response_time = sim_func(mode,arrival,service,m,setup_time,delayedoff_time,time_end)
+
+%function avg_response_time = sim_func(mode,arrival,service,m,setup_time,delayedoff_time,time_end)
+mode='trace';
+arrival=1;
+service=1;
+m=3;
+setup_time=50;
+delayedoff_time=100;
+time_end=200;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Input parameters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -145,8 +153,8 @@ while (master_clock < time_end)
     elseif (min(time_list)==first_setup_time) %completing setup event
         next_event_type = 2;
         next_event_time = first_setup_time;
-    else %completing delayed off event 
-        next_event_tyoe =3;
+    elseif (min(time_list)==first_delayedoff_time) %completing delayed off event 
+        next_event_type =3;
         next_event_time = first_delayedoff_time;
     end    
        
@@ -203,8 +211,12 @@ while (master_clock < time_end)
             service_time_next_arrival = -log(1-rand(1))/service;
         elseif (mode_type==1) %trace mode
             list_count = list_count+1;
-            next_arrival_time =  arrival_time_list(list_count);
-            service_time_next_arrival = service_time_list(list_count);
+            if (list_count>length(arrival_time_list) )
+                next_arrival_time=time_end+1;
+            else
+                next_arrival_time =  arrival_time_list(list_count);
+                service_time_next_arrival = service_time_list(list_count);
+            end
         end
         
     elseif (next_event_type == 0) % a departure event
@@ -275,21 +287,8 @@ while (master_clock < time_end)
         % Change the server to OFF
         server_status(first_delayedoff_server,:)=[0,nan,nan];
     end
-        
-                    
-                    
-                
-                 
-                    
-                
-
-            
-            
-            
-            
        
 end        
      
 avg_response_time = response_time_cumulative/num_job_served;
-
     
