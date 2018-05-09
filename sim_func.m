@@ -1,4 +1,3 @@
-
 %function avg_response_time = sim_func(mode,arrival,service,m,setup_time,delayedoff_time,time_end)
 mode='trace';
 arrival=1;
@@ -125,6 +124,12 @@ queue_length = 0;
 
 % Start iteration until the end time
 while (master_clock < time_end)
+%     if (master_clock>20)
+%         break
+%     end
+%     disp('master clock: ');
+%     disp(master_clock);
+
     %%%%%%%%%%%%%%%%%%%%%%%[
     %Determining next event type
     %%%%%%%%%%%%%%%%%%%%%%%
@@ -157,7 +162,11 @@ while (master_clock < time_end)
         next_event_type =3;
         next_event_time = first_delayedoff_time;
     end    
-       
+    
+
+%     disp('next event type:');
+%     disp(next_event_type);
+
     %update master clock
     master_clock = next_event_time;
     %
@@ -182,10 +191,10 @@ while (master_clock < time_end)
                 %
                 % choose a random server and change the server's status to
                 % setup 
-                temp_list = find(any(server_status(:,1)==0)); %all servers in off state
+                temp_list = find((server_status(:,1)==0)); %all servers in off state
                 pos = randi(length(temp_list));
                 chosen_server = temp_list(pos);
-                server_status(chosen_server,1)=3; %change server state to setup
+                server_status(chosen_server,1)=1; %change server state to setup
                 %
                 % add setup complete time to the server status
                 server_status(chosen_server,2)=master_clock+setup_time;
@@ -195,8 +204,11 @@ while (master_clock < time_end)
                 %
                 % store the arriving job in queue including its arrival
                 % time and service time; mark the job
+
                 job_arrive_info = [next_arrival_time, service_time_next_arrival, 1];
                 queue_content = [queue_content;job_arrive_info];
+%                  disp('ayy');
+%                  disp(queue_content);
             else % all servers are either busy or setup
                 %
                 % store the job in queue and unmark the job
@@ -246,7 +258,7 @@ while (master_clock < time_end)
             arrival_time_next_departure(first_departure_server) = job_send_info(1);
             %
             % remove the sent job from queue and decrement number of jobs in queue by 1
-            removerows(queue_content,1);
+            queue_content=removerows(queue_content,1);
             queue_length = queue_length-1;
             
             if (job_send_info(3)==1) % if the sent job is marked
@@ -274,7 +286,7 @@ while (master_clock < time_end)
         job_send_info =  queue_content(1,:);
         % remove this job from queue
         queue_length = queue_length-1;
-        removerows(queue_content,row_number);
+        queue_content=removerows(queue_content,row_number);
         % sent this job to this server
         next_departure_time(first_setup_server) = job_send_info(2)+master_clock;
         arrival_time_next_departure(first_setup_server) = job_send_info(1);
@@ -291,4 +303,3 @@ while (master_clock < time_end)
 end        
      
 avg_response_time = response_time_cumulative/num_job_served;
-    
